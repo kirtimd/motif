@@ -1,0 +1,28 @@
+# Local infrastructure for Motif.
+# Postgres with the pgvector extension preinstalled — handles relational data,
+# vector similarity search, and graph-style link queries all in one place.
+#
+#   docker compose up -d      # start the database
+#   docker compose down       # stop it (data persists in the named volume)
+#   docker compose down -v     # stop AND wipe the data
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: motif-db
+    environment:
+      POSTGRES_USER: motif
+      POSTGRES_PASSWORD: motif
+      POSTGRES_DB: motif
+    ports:
+      - "5432:5432"
+    volumes:
+      - motif_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U motif"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  motif_pgdata:

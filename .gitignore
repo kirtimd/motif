@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Node
+node_modules/
+dist/
+*.local
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code local config (machine-specific)
+.claude/
