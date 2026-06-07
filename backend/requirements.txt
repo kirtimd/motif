@@ -4,3 +4,6 @@ uvicorn[standard]==0.34.0
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 python-dotenv==1.0.1
+
+# Phase 1 — capture
+alembic==1.14.0

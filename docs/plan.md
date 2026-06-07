@@ -2,61 +2,105 @@
 
 ## Vision
 
-A personal knowledge tool that captures anything interesting from anywhere, then
-uses AI to auto-organize it into a connected knowledge graph — surfacing
-patterns, connections, project ideas, and resurfacing things worth revisiting.
+Motif owns the compounding, intent-rich record of what sparks you, and a
+proactive loop that turns it into things you actually make. The reasoning is
+rented from Claude; the corpus, the intent, and the loop are owned. Full thesis
+in [`vision.md`](vision.md).
 
-Primary goal: solve the "everything stays bookmarked forever and the spark dies"
-problem. Secondary goal: a hands-on project to learn AI app development.
+Primary goal: close the gap between consuming and creating — today the spark dies
+in a bookmark graveyard. Success = things *made*, not items stored. Secondary
+goal: a hands-on project to learn AI app development.
 
 ## Guiding principles
 
-- **Capture must be frictionless and universal before it is fancy.** One paste
-  box beats ten fragile platform integrations. Add native capture later.
-- **The brain is the product.** The differentiator is connection & synthesis,
-  not the act of saving. Invest there.
+- **Rent the model, own what compounds.** Reasoning is commodity (Claude); the
+  moat is the intent-rich corpus + the spark→artifact loop + the initiative.
+  Test every feature: does a *better* model strengthen it, or obsolete it?
+- **Capture must be frictionless, and capture intent.** One paste box + the *why
+  this sparked me*. The intent note is the highest-value signal — catch it early.
+- **The loop is the product.** Spark → suggestion → tracked artifact. Don't be a
+  thin wrapper: the loop must close to real output, not lost chat replies.
 - **Always have something running.** Every phase ends with a working app.
-- **Provider-agnostic AI.** Never hard-code a vendor; swap behind an interface.
+- **Provider-agnostic, Claude-first.** Swap behind an interface, but build for Claude.
 
 ## Architecture (MVP)
 
 ```
-┌──────────────┐     paste link/text      ┌───────────────────────┐
-│  React app   │ ───────────────────────► │   FastAPI backend     │
-│  (frontend)  │ ◄─────────────────────── │                       │
-└──────────────┘    items, connections     │  - capture/extract    │
-                                           │  - embeddings         │
-                                           │  - synthesis (LLM)    │
-                                           └──────────┬────────────┘
-                                                      │
-                                           ┌──────────▼────────────┐
-                                           │ Postgres + pgvector   │
-                                           │  items, tags, links,  │
-                                           │  embeddings (vectors) │
-                                           └───────────────────────┘
+   paste link/text + spark note
+┌──────────────┐  ───────────────►  ┌───────────────────────┐      ┌──────────────┐
+│  React app   │                    │   FastAPI backend     │ ───► │  Claude API  │
+│  (frontend)  │  ◄───────────────  │  capture/extract,     │ ◄─── │ (rented brain)│
+└──────────────┘  feed, suggestions │  assemble corpus,     │      └──────────────┘
+                                    │  run the loop         │
+                                    └──────────┬────────────┘
+                                               │
+                                    ┌──────────▼─────────────────┐
+                                    │ Postgres (+pgvector ready,  │
+                                    │  unused until scale)        │
+                                    │  items, suggestions         │
+                                    └─────────────────────────────┘
 ```
 
-Why **Postgres + pgvector**: one store handles relational metadata, vector
-similarity search ("find related"), and graph-style link queries. No separate
-vector database to operate.
+**Claude-first, corpus-in-context.** While the corpus is small, hand the whole
+intent-rich corpus to Claude (prompt-cached) and let it cluster + suggest —
+qualitatively richer than vector similarity, and cheap at small N. pgvector stays
+installed but unused until the corpus outgrows the context window (~few hundred
+items), at which point embeddings return as a **retrieval (RAG)** layer that
+feeds Claude only the relevant slice and keeps cost flat.
+
+> Similarity / auto-organize (the original goal) is delivered by **Claude now**,
+> and by **embeddings + RAG at scale** — preserved throughout, not dropped.
 
 ### AI provider abstraction
 
-Two interfaces, each with swappable implementations:
+- `LLMProvider.complete(prompt) -> text` — **Claude-first**; clustering,
+  suggestions, drafting. The core engine from V1.
+- `EmbeddingProvider.embed(texts) -> vectors` — added at scale (Phase 4) for RAG
+  retrieval. Candidate: local sentence-transformers (free) or hosted (~$0.02/1M).
 
-- `EmbeddingProvider.embed(texts) -> vectors` — for semantic search / related items.
-- `LLMProvider.complete(prompt) -> text` — for tagging, themes, idea synthesis.
+## Data model
 
-Default is chosen in Phase 2/3 (candidates: local sentence-transformers for
-embeddings = free/private; Claude for synthesis). Config via env vars.
+### `items` (Phase 1 — signed off)
 
-## Data model (first cut)
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID (PK) | non-enumerable, URL-safe |
+| `user_id` | UUID, not-null, indexed | defaults to `SEED_USER_ID`; multi-tenant-ready |
+| `source_type` | varchar | `url` \| `text` \| `note` (validated string, not a DB enum) |
+| `source_url` | text, nullable | original link |
+| `title` | text, nullable | |
+| `content` | text, nullable | extracted body / note text |
+| `excerpt` | text, nullable | short preview for cards |
+| `image_url` | text, nullable | lead image |
+| `spark_note` | text, nullable | **the intent** — why this sparked you (highest-value signal) |
+| `status` | varchar, default `ready` | `pending` \| `ready` \| `failed` |
+| `extra` | JSONB, default `{}` | author, site_name, published_at, word_count… |
+| `created_at` / `updated_at` | timestamptz | |
 
-- **item** — id, source_url, source_type, title, content (extracted text),
-  image_url, created_at, captured_note.
-- **tag** — id, name; **item_tag** — many-to-many.
-- **embedding** — item_id, vector (pgvector).
-- **link** — from_item, to_item, kind (e.g. "similar", "cites"), score.
+Index: `(user_id, created_at)` — the feed query.
+
+**Design decisions (with rationale):**
+- **UUID PK** — non-enumerable & URL-safe for a future public multi-user app.
+- **Seed-constant `user_id`** — every row owned + every query scoped by `user_id`
+  now, without building auth. Add real `users` table + FK later (see checklist).
+- **Flexible string + JSONB** — evolve sources/metadata without migrations while
+  the model is still moving; promote a field to a real column when we must query it.
+
+### Coming later (by phase)
+- **suggestion** (Phase 2) — id, user_id, kind (build/write/learn), title, body,
+  status (suggested/making/done/dismissed), source spark ids (provenance).
+- **embedding** (Phase 4, at scale) — item_id, vector (pgvector) for RAG retrieval.
+- **tag / link** (later) — auto-tags and explicit item links if they earn their keep.
+
+### ⚠️ Auth-migration checklist (do ALL when real auth lands)
+
+The seed-constant `user_id` is a training wheel. When adding multi-user auth:
+1. Create a `users` table; insert your real account.
+2. Backfill: `UPDATE items SET user_id = <your real id>` (was `SEED_USER_ID`).
+3. Add the foreign key `items.user_id -> users.id`.
+4. **Drop the `user_id` default** so inserts MUST supply the logged-in user —
+   otherwise new users' data silently lands under the seed id (cross-user leak).
+5. Confirm every query filters by the authenticated `user_id` (already the habit).
 
 ## Roadmap
 
@@ -67,27 +111,34 @@ embeddings = free/private; Claude for synthesis). Config via env vars.
 - [ ] One command (or short README) to run all three locally.  ← nice-to-have next
 - **Done when:** open the web app, it shows "backend healthy" from a live API call. ✅
 
-### Phase 1 — Capture
-- [ ] `POST /items` with a URL or raw text/note.
-- [ ] URL fetch + readability extraction (title, main text, lead image, source type).
-- [ ] Persist item; `GET /items` list endpoint.
-- [ ] Frontend: paste box + reverse-chronological feed of captured items.
-- **Done when:** paste a link, see a clean card appear in your feed.
+### Phase 1 — Capture with intent + provenance  ← we are here
+- [x] Data model: `items` table + SQLAlchemy model + Alembic migration.
+- [ ] `POST /items` — URL or text/note + `spark_note`; auto-record provenance.
+- [ ] URL fetch + readability extraction (title, excerpt, lead image, source type).
+- [ ] `GET /items` list endpoint.
+- [ ] Frontend: paste box + spark-note field + reverse-chronological feed.
+- **Done when:** paste a link with a why-note, see a clean card in your feed.
 
-### Phase 2 — The brain (connections)
-- [ ] Generate & store an embedding on each capture.
-- [ ] "Related items" via vector similarity.
-- [ ] Auto-tagging (LLM or keyword extraction).
-- **Done when:** opening an item shows genuinely related items.
+### Phase 2 — The loop (the differentiator, pulled early)
+- [ ] `suggestion` table + provider-agnostic `LLMProvider` (Claude-first).
+- [ ] "What can I make?" → Claude reads the corpus → suggestions citing sparks.
+- [ ] Accept a suggestion → tracked artifact (status suggested→making→done).
+- [ ] Prompt-cache the corpus; structured outputs for suggestions.
+- **Done when:** Motif proposes something to make from your sparks, and you can
+  accept it into tracked work.
 
-### Phase 3 — Synthesis (the magic)
-- [ ] Periodic/triggered LLM pass: cluster items into themes.
-- [ ] Generate project ideas & learning paths from clusters.
-- [ ] Resurface forgotten-but-relevant items.
+### Phase 3 — Proactivity (the engine)
+- [ ] Motif *initiates* the loop: scheduled/triggered nudges.
+- [ ] Resurface forgotten-but-relevant sparks.
 - **Done when:** Motif tells you something useful you didn't ask for.
 
-### Phase 4 — Graph UI
-- [ ] Visualize items and their links as an interactive graph.
+### Phase 4 — Scale the brain (embeddings return as RAG)
+- [ ] Embeddings on each item; pgvector retrieval of the relevant slice.
+- [ ] Keeps Claude cost flat + corpus searchable once it outgrows the context window.
+- **Done when:** suggestions stay fast/cheap with a large corpus.
+
+### Phase 5 — Later
+- [ ] Graph UI · richer capture sources · "context wallet" export.
 
 ## Deferred (post-MVP, intentionally)
 
@@ -97,6 +148,6 @@ deployment/hosting.
 
 ## Open decisions (revisit when relevant)
 
-- Embedding model default (local vs hosted).
-- LLM provider default for synthesis.
+- Claude model tier for the loop (Haiku / Sonnet / Opus) — cost vs quality.
+- Embedding model default when Phase 4 arrives (local vs hosted).
 - Background job mechanism for Phase 3 (inline vs queue/cron).

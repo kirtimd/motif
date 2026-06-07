@@ -1,25 +1,38 @@
 # Motif
 
-Capture everything that piques your attention — links, posts, articles, videos,
-notes — into one place, and let AI auto-organize it into a connected knowledge
-graph that surfaces patterns, connections, and ideas you'd otherwise forget.
+> **Motif owns the compounding, intent-rich record of what sparks you, and a
+> proactive loop that turns it into things you actually make. The reasoning is
+> rented from Claude; the corpus, the intent, and the loop are owned — and they
+> get more valuable every month and every model upgrade.**
 
-> We consume information at a terrifying rate. Most of it gets bookmarked,
-> drafted, or screenshotted — and the spark dies. Motif exists to retain and
-> build on the things that genuinely interest you.
+We consume information at a terrifying rate. Most of what grabs us gets
+bookmarked, drafted, or screenshotted — and the spark dies in a graveyard of
+tabs. Motif exists to keep that spark alive and turn it into output.
 
-## Status
+Motif is **not** a note app or a personal wiki, and it doesn't try to out-think
+Claude. The intelligence is *rented* (and improves for free as models do). What
+Motif *owns* is the part that compounds: a proprietary, intent-rich,
+provenance-tracked corpus of what catches your attention, and a closed loop from
+**spark → suggestion → artifact**.
 
-🚧 Early development — building the MVP. See [`docs/plan.md`](docs/plan.md).
+> Guiding principle: **rent the model, own what compounds.**
 
-## MVP scope
+See [`docs/vision.md`](docs/vision.md) for the full thesis and
+[`docs/plan.md`](docs/plan.md) for the build roadmap.
 
-1. **Capture** — paste any link, text, or note; Motif fetches and extracts it.
-2. **Connect** — embeddings + auto-tagging organize items into a knowledge graph.
-3. **Surface** — AI finds relationships, project ideas, and resurfaces forgotten gems.
+🚧 Early development.
 
-Fancy per-platform capture (browser extension, mobile share sheet, OCR for
-handwritten notes, audio transcription) comes *after* the core brain works.
+## What V1 proves
+
+1. **Capture with intent** — save any link / text / note in seconds, plus the
+   *why it sparked you*. Provenance (source, time) is recorded automatically.
+2. **Close the loop** — grounded in your corpus, Claude proposes things you
+   could *make* (build / write / learn), citing the sparks behind each.
+3. **Track the artifact** — accept a suggestion and it becomes tracked work, so
+   progress compounds and nothing gets re-suggested.
+
+Proactive nudges, semantic clustering at scale, and richer capture sources come
+*after* the loop works.
 
 ## Stack
 
